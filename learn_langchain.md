@@ -155,3 +155,191 @@ models:
 | Role Awareness   | No understanding of "user" and "assistant" roles                               | Understands "system", "user", and "assistant" roles                          |
 | Example Models   | GPT-3, Llama-2-7B, Mistral-7B, OPT-1.3B                                        | GPT-4, GPT-3.5-turbo, Llama-2-Chat, Mistral-Instruct, Claude                 |
 | Use Cases        | Text generation, summarization, translation, creative writing, code generation | Conversational AI, chatbots, virtual assistants, customer support, AI tutors |
+
+---
+
+### Prompts
+
+**static vs dynamic prompt**: Static prompts are often inefficient and inflexible, as they require manual modification for each new scenario. Prompt templates (dynamic prompts/messages) address this by allowing dynamic insertion of values.
+
+```
+                           Model
+                             |
+                         [invoke]
+                             |
+              +--------------+--------------+
+              |                             |
+        single message                list of messages
+   (single turn stand alone          (multi-turn conversation)
+         queries)                             |
+              |                     +---------+---------+
+        +-----+-----+               |                   |
+        |           |         Static Message      Dynamic Message
+  Static Message    |      (SystemMessage,      (ChatPromptTemplate)
+                    |       HumanMessage,
+             Dynamic Message    AIMessage)
+           (PromptTemplate)
+```
+
+follow this <a href="https://github.com/campusx-official/langchain-prompts/tree/main">repo</a> to understand code usage of:
+
+- prompt template generator (dynamic single message) --> `prompt_generator.py`
+- simple chaining of prompt template and model --> `prompt_ui.py`
+- messages (list of message, static) --> `message.py`
+- chat prompt template (list of message, dynamic) --> `chat_prompt_template.py`
+- message placeholder (list of message, dynamic) --> `message_placeholder.py`
+
+#### Prompt Templates | Dynamic Message (Single-turn)
+
+**Core Template Structure:**
+
+- **Pre-written Template String:** Use case-specific prompt string that serves as the base template.
+- **Input Variables:** Define placeholders (e.g., `{query}`, `{context}`) within your prompt string using curly braces. These are the dynamic parts.
+- **Invoking Variables:** Pass a dictionary to the `PromptTemplate.format()` method with keys matching your input variables.
+
+**Standard Template Components:**
+
+- **Role Definition:** Assign a clear persona or role to the LLM (e.g., "You are a helpful assistant...", "You are an expert Python programmer...") to influence its tone, style, and the type of information it provides.
+- **Context Section:** Provide sufficient and relevant background information for the LLM to generate accurate and helpful responses (user preferences, domain knowledge, previous conversation turns).
+- **Task Instruction:** Clearly define what you want the LLM to do. Be specific and unambiguous about the expected behavior.
+- **Output Format Specification:** Explicitly define the desired output format (e.g., JSON, XML, bullet points, markdown table) to ensure structured and parseable responses.
+- **Constraints & Guardrails:** Set clear limits on the LLM's response (maximum length, tone requirements, content restrictions, safety instructions).
+
+**Template Enhancement Techniques:**
+
+- **Few-shot Examples:** Embed high-quality input-output examples directly into the template to guide the LLM's behavior. Particularly useful for:
+  - Complex or nuanced tasks
+  - Specific formatting requirements
+  - Demonstrating desired reasoning patterns
+- **Variable Placeholders:** Use clear, descriptive variable names (e.g., `{user_query}`, `{document_context}`, `{max_words}`) for better template readability and maintenance.
+- **Input Variable Validation:** use `validate_template=True` in the template object for extra layer of validating the input variables.
+
+#### Best Practices & Considerations
+
+**Clarity & Precision:**
+
+- Be specific, not vague; ambiguity → unpredictable results
+- Break complex instructions into numbered/bulleted steps
+
+**Context Management:**
+
+- Provide necessary context only (general → specific structure)
+- Respect token limits; balance detail with token budget
+
+**Output Control:**
+
+- Always specify output format explicitly
+- Include examples for complex formats
+- Define length, style, and content constraints
+
+**Token Efficiency:**
+
+- Design concise and efficient templates
+- Be mindful of underlying LLM token limits, especially when incorporating examples
+
+**Maintenance & Reusability:**
+
+- Serialize templates (JSON/YAML) for version control and sharing
+- Use descriptive names; document purpose and behavior
+
+**Safety & Quality:**
+
+- Add guardrails against harmful/biased/off-topic content
+- Test with edge cases and adversarial inputs
+
+**Iterative Development & Monitoring:**
+
+- Start simple → test → analyze → refine
+- Track modifications; small changes = significant impact
+- A/B test template variations when possible
+- Monitor for degradation when models are updated
+
+**Domain Adaptation:**
+
+- Customize templates for specific domains (technical, creative, conversational)
+- Adjust formality, terminology, and structure based on target audience
+- Consider cultural and linguistic nuances when applicable
+
+#### Prompt Engineering Techniques
+
+**Reasoning Enhancement Techniques:**
+
+- **Chain-of-Thought (CoT) Prompting:** Structure prompts to encourage step-by-step reasoning. Include examples of intermediate thought processes to guide the LLM's reasoning pattern.
+- **Tree of Thought (ToT):** Enable the LLM to explore multiple reasoning paths systematically. Structures prompts for complex problem-solving with branching exploration of solution spaces.
+- **Self-Consistency:** Generate multiple CoT reasoning paths from a single prompt and aggregate results. Reduces reliance on a single LLM output for more robust answers.
+
+**Knowledge Augmentation Techniques:**
+
+- **Generated Knowledge Prompting:** Design prompts that first instruct the LLM to generate relevant background knowledge, then use that knowledge to answer the primary query. Enhances accuracy for knowledge-intensive tasks.
+- **Retrieval-Augmented Generation (RAG):** Combine prompt templates with external knowledge retrieval. Template structures the query for both retrieval and generation phases.
+
+**Agent-Based Techniques:**
+
+- **ReAct (Reasoning + Acting):** For agentic workflows, combine explicit reasoning steps with tool-use actions. Template guides the LLM through: Reason → Act → Observe → Reason cycle, enabling dynamic interaction with external environments.
+
+**Meta-Techniques:**
+
+- **Automatic Prompt Engineer (APE):** Automated iterative refinement using an LLM to generate and evaluate candidate prompt instructions. Systematically improves template effectiveness without constant manual trial-and-error.
+
+#### Messages
+
+there are 3 boiled down messages in a chat:
+
+- system message
+- human message
+- AI message
+
+use these to maintain chat history --> **data annotation/labeled message**: which message coming from whom with additional metadata
+
+> [applicable for prompt template, not chat prompt template] use `SystemMessage`, `HumanMessage` abd `AIMessage` from `langchain_core.messagees`
+
+#### Chat Prompt Templates | Dynamic Message (Multi-turn Conversation)
+
+This is a prompt template but for multi turn coversation. it may consists of system, human and AI messages and can be made dynamic.
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+chat_template = ChatPromptTemplate([
+    ('system', 'You are a helpful {domain} expert'),
+    ('human', 'Explain in simple terms, what is {topic}')
+])
+
+prompt = chat_template.invoke({'domain':'cricket','topic':'Dusra'})
+```
+
+#### Message Placeholder
+
+A `MessagesPlaceholder` in langchain is a special placeholder used inside a `ChatPromptTemplate` to dynamically insert chat history or a list of messages at runtime.
+
+**Why Message Placeholder when we have Chat Prompt Template?**
+
+`ChatPromptTemplate` allows you to define static message structures with dynamic values (e.g., `{topic}`, `{domain}`), but it doesn't handle **variable-length message lists**. `MessagesPlaceholder` solves this by:
+
+- **Dynamic Chat History:** Insert entire conversation histories of varying lengths (could be 2 messages or 200 messages)
+- **Flexible Message Lists:** Handle scenarios where the number of messages isn't known at template design time
+- **Runtime Message Injection:** Pass complete message objects (with roles and content) rather than just string values
+
+Without `MessagesPlaceholder`, you'd need to hardcode the exact number of messages in your template, which is impractical for conversational applications with growing chat histories.
+
+```python
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+# chat template
+chat_template = ChatPromptTemplate([
+    ('system','You are a helpful customer support agent'),
+    MessagesPlaceholder(variable_name='chat_history'), # --> we can parse any variable value here in runtime
+    ('human','{query}')
+])
+
+chat_history = []
+# load chat history
+with open('chat_history.txt') as f:
+    chat_history.extend(f.readlines())
+
+# create prompt
+prompt = chat_template.invoke({'chat_history':chat_history, 'query':'Where is my refund'})
+```
+
+---
+
+### Structured Output
