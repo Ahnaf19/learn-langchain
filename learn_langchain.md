@@ -1,16 +1,81 @@
 # Learn Langchain
 
-```python
-# TODO: add learning introduction
-```
+This guide provides a structured approach to learning LangChain - a powerful framework for building LLM-powered applications. The document is organized to take you from foundational concepts to advanced patterns, with practical examples and best practices throughout.
+
+> special thanks to CampusX: This document compiles my learning note from their "Generative AI usinf LangChain playlist"
+
+**Learning Path:** Start with the mental models of core components, then dive deep into each component sequentially. Each section builds on previous knowledge, so following the order is recommended for beginners.
+
+**Sequential Learning Roadmap:**
+
+- **Foundations**
+  - Models (LLMs, Chat Models, Embedding Models)
+  - Model Parameters (temperature, top_p, max_tokens, etc.)
+- **Input Engineering**
+  - Prompt Templates (PromptTemplate, ChatPromptTemplate)
+  - Messages (SystemMessage, HumanMessage, AIMessage)
+  - Message Placeholders
+  - Prompt Engineering Techniques (CoT, ToT, Few-shot, RAG)
+- **Output Handling**
+  - Structured Output (`with_structured_output()`)
+  - Output Parsers (Str, JSON, Structured, Pydantic)
+  - Data Format Schemas (TypedDict, Pydantic, JSON Schema)
+- **Building Blocks**
+  - Runnables (Task-Specific & Primitives)
+  - LCEL (LangChain Expression Language)
+  - Chains (Sequential, Parallel, Conditional)
+- **Knowledge Integration**
+  - Document Loaders (PDF, CSV, Web, APIs)
+  - Text Splitters (Character, Token, Recursive, Semantic)
+  - Embedding Models & Vector Representations
+  - Vector Stores (Chroma, Pinecone, FAISS, Weaviate)
+  - Retrievers (Similarity, MMR, Contextual Compression)
+  - RAG (Retrieval-Augmented Generation) Patterns
+- **State Management**
+  - Memory Types (Buffer, Window, Summary, Custom)
+  - Conversation History Management
+  - Context Window Optimization
+- **Advanced Patterns**
+  - Agents & Tool Calling
+  - ReAct (Reasoning + Acting) Pattern
+  - Multi-Agent Systems
+  - Custom Tools & Function Calling
+  - Streaming & Async Execution
+  - Error Handling & Fallbacks
 
 ---
 
 ## Introduction
 
+**What is LangChain?**
+
+LangChain is a Python framework that simplifies building applications powered by Large Language Models (LLMs). It provides abstractions and tools to compose LLMs with external data sources, APIs, and custom logic into sophisticated AI applications.
+
+**Why LangChain?**
+
+- **Unified Interface**: Work with any LLM (OpenAI, Anthropic, Google, local models) through a consistent API
+- **Composability**: Chain components together using intuitive syntax (LCEL)
+- **Production-Ready**: Built-in support for streaming, async, error handling, and monitoring
+- **Extensibility**: Easily integrate custom logic, tools, and data sources
+- **Rich Ecosystem**: Pre-built integrations with vector stores, document loaders, and agent tools
+
+**Core Philosophy:**
+
+LangChain treats everything as composable "Runnables" - units of work that can be chained together using the pipe operator (`|`). This makes complex workflows readable and maintainable:
+
 ```python
-# TODO: add langchain introduction
+chain = prompt_template | model | output_parser
+result = chain.invoke({'input': 'your query'})
 ```
+
+**Use Cases:**
+
+- Chatbots & Virtual Assistants
+- Question-Answering over Documents (RAG)
+- Code Generation & Analysis
+- Data Extraction & Summarization
+- Multi-step Reasoning & Agents
+- Content Generation Pipelines
 
 ---
 
@@ -467,13 +532,20 @@ yep, make simple or complex pipelines for your whole application!
 
 **Parallel Chain Example:**
 
+```text
+Flow diagram:
+                           ┌─> prompt1 -> model -> parser1 ─┐
+{inputs} -> parallel_step ─┤                                ├─> prompt3 -> model -> parser3 -> result
+                           └─> prompt2 -> model -> parser2 ─┘
+```
+
 ```python
 from langchain.schema.runnable import RunnableParallel
 
 # Step 1: Two chains execute in parallel with different inputs
 parallel_step = RunnableParallel(
-    product_info=prompt1 | model | parser1,  # uses {product_name}
-    customer_history=prompt2 | model | parser2  # uses {customer_id}
+    product_info=prompt1 | model | parser1,        # parallel chain 1: uses {product_name}
+    customer_history=prompt2 | model | parser2     # parallel chain 2: uses {customer_id}
 )
 
 # Step 2: Combine parallel results and feed to final chain
@@ -490,13 +562,22 @@ result = final_chain.invoke({
 
 **Conditional Chain Example:**
 
+```text
+Flow diagram:
+                    ┌─> condition1 == True  -> chain1 ─┐
+                    │                                   │
+{input} -> branch_chain ─┼─> condition2 == True  -> chain2 ─┼─> result
+                    │                                   │
+                    └─> else (default)     -> default_chain ─┘
+```
+
 ```python
 from langchain.schema.runnable import RunnableBranch, RunnableLambda
 
 branch_chain = RunnableBranch(
-    (condition1, chain1), # brnach 1
-    (condition2, chain2), # brnach 2
-    default_chain # if no condition is met, execute this chain (use RunnableLambda for dummy chain)
+    (condition1, chain1),     # branch 1: if condition1 is True
+    (condition2, chain2),     # branch 2: if condition2 is True
+    default_chain             # default: if no condition is met (use RunnableLambda for dummy chain)
 )
 ```
 
@@ -505,3 +586,119 @@ for more code examples go through <a href="https://github.com/campusx-official/l
 ---
 
 #### Runnables
+
+Runnables are the fundamental building blocks of LangChain chains - they represent **units of work** that can be composed together.
+
+**Core Concept:**
+
+- **Input → Process → Output**: Every runnable takes an input, processes it, and produces an output
+- **Standardized Interface**: All runnables implement the same interface (`invoke()`, `batch()`, `stream()`, `ainvoke()`)
+- **Composable**: Can be connected using the pipe operator (`|`) to build chains
+- **Type-Safe**: Input/output types are clearly defined for better error handling
+
+**Key Characteristics:**
+
+- **Chainable**: Connect multiple runnables sequentially: `runnable1 | runnable2 | runnable3`
+- **Parallelizable**: Execute multiple runnables simultaneously using `RunnableParallel`
+- **Conditional**: Branch execution based on conditions using `RunnableBranch`
+- **Reusable**: Same runnable can be used in multiple chains
+- **Debuggable**: Built-in support for tracing and visualization (`get_graph()`)
+
+**Standard Methods:**
+
+- `invoke(input)`: Synchronous single execution
+- `batch([inputs])`: Process multiple inputs at once
+- `stream(input)`: Stream output incrementally
+- `ainvoke(input)`: Async single execution (for concurrent operations)
+
+**Why Runnables?**
+
+- **Consistency**: Same interface across all components (prompts, models, parsers, etc.)
+- **Flexibility**: Easy to swap components without changing chain structure
+- **Performance**: Built-in optimization for parallel and streaming execution
+- **Maintainability**: Clear data flow and modular architecture
+
+##### Common Runnable Types
+
+Runnables can be divided in two categories:
+
+**1. Task-Specific Runnables**
+
+- Definition: These are core LangChain components that have been converted into Runnables so they can be used in pipelines.
+- Purpose: Perform task-specific operations like LLM calls, prompting, retrieval, etc.
+
+**Examples:**
+
+- `ChatOpenAI` → Runs an LLM model
+- `PromptTemplate` → Formats prompts dynamically
+- `Retriever` → Retrieves relevant documents
+- `OutputParser` → Parses and structures model outputs
+
+**2. Runnable Primitives**
+
+- Definition: These are fundamental building blocks for structuring execution flow.
+- Purpose: They help orchestrate execution by defining how different Runnables are combined (sequentially, in parallel, conditionally, etc.).
+
+**Examples:**
+
+- `RunnableSequence` → Runs steps in order (`|` operator)
+- `RunnableParallel` → Runs multiple steps simultaneously
+- `RunnableMap` → Maps the same input across multiple functions
+- `RunnableBranch` → Implements conditional execution (if-else logic)
+- `RunnableLambda` → Wraps custom Python functions into Runnables
+- `RunnablePassthrough` → Just forwards input as output (acts as a placeholder)
+
+#### Langchain Expression Language (LCEL)
+
+LCEL is LangChain's declarative syntax for building chains using the pipe operator (`|`). It's a simple, intuitive way to compose Runnables into complex workflows.
+
+**What is LCEL?**
+
+LCEL is the syntax/interface that allows you to chain Runnables together using `|`. Think of it as the "glue" that connects components.
+
+```python
+# LCEL syntax: component1 | component2 | component3
+chain = prompt_template | model | output_parser
+result = chain.invoke({'input': 'value'})
+```
+
+**Key Benefits:**
+
+- **Readability**: Chains read left-to-right like Unix pipes (`data | transform | process`)
+- **Simplicity**: No need for complex class inheritance or boilerplate code
+- **Composability**: Mix and match any Runnables (prompts, models, parsers, custom functions)
+- **Automatic Features**: Get streaming, async, batching, and parallel execution for free
+
+**LCEL vs Traditional Approach:**
+
+```python
+# Traditional approach (verbose)
+prompt = prompt_template.format(topic="AI")
+response = model.invoke(prompt)
+parsed = output_parser.parse(response)
+
+# LCEL approach (concise)
+chain = prompt_template | model | output_parser
+result = chain.invoke({'topic': 'AI'})
+```
+
+**Common LCEL Patterns:**
+
+```python
+# Sequential: A -> B -> C
+chain = step1 | step2 | step3
+
+# Parallel: (A, B) -> C
+parallel = RunnableParallel(a=chain1, b=chain2)
+full_chain = parallel | step3
+
+# Conditional: if-else branching
+branch = RunnableBranch((condition, chain1), chain2)
+
+# With custom functions
+chain = prompt | model | RunnableLambda(custom_function) | parser
+```
+
+**Why LCEL Matters:**
+
+LCEL is the modern way to build LangChain applications. It replaces older patterns (like `LLMChain`, `SequentialChain`) with a unified, more powerful approach that works seamlessly with all Runnables.
