@@ -455,3 +455,53 @@ for more visit <a href="https://github.com/campusx-official/langchain-output-par
 ---
 
 ### Chains
+
+yep, make simple or complex pipelines for your whole application!
+
+- `sequential`
+- `parallel`
+- `conditional`
+- `complex`
+
+> use `chain.get_graph().print_ascii()` to visualize the pipeline flow
+
+**Parallel Chain Example:**
+
+```python
+from langchain.schema.runnable import RunnableParallel
+
+# Step 1: Two chains execute in parallel with different inputs
+parallel_step = RunnableParallel(
+    product_info=prompt1 | model | parser1,  # uses {product_name}
+    customer_history=prompt2 | model | parser2  # uses {customer_id}
+)
+
+# Step 2: Combine parallel results and feed to final chain
+final_chain = parallel_step | prompt3 | model | parser3
+
+# Full execution: parallel chains -> sequential final chain
+result = final_chain.invoke({
+    'product_name': 'iPhone 15',
+    'customer_id': 'C12345'
+})
+# parallel_step output: {'product_info': '...', 'customer_history': '...'}
+# final output: personalized recommendation based on both inputs
+```
+
+**Conditional Chain Example:**
+
+```python
+from langchain.schema.runnable import RunnableBranch, RunnableLambda
+
+branch_chain = RunnableBranch(
+    (condition1, chain1), # brnach 1
+    (condition2, chain2), # brnach 2
+    default_chain # if no condition is met, execute this chain (use RunnableLambda for dummy chain)
+)
+```
+
+for more code examples go through <a href="https://github.com/campusx-official/langchain-chains">this repo</a>
+
+---
+
+#### Runnables
