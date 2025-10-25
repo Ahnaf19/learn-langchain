@@ -343,3 +343,115 @@ prompt = chat_template.invoke({'chat_history':chat_history, 'query':'Where is my
 ---
 
 ### Structured Output
+
+have language models return responses in a **well-defined data format** (e.g. json) rather than free-form text. This makes the model output easier to parse and work with programmatically.
+
+two types of models:
+
+- model that can give structured output (use: `with_structured_output()`)
+- model that can't give structured output (use: Output Parser)
+
+#### with_structured_output Function
+
+```python
+from typing, import TypedDict, Annotated
+
+class DataFormat(TypedDict): # can use pydantic basemodel
+    summary: Annotated[str, "A brief summary of the review"]
+    sentiment: Annotated[str, "Return sentiment of the review either negative, positive or neutral"]
+
+structured_model = model.with_structured_output(DataFormat) # this generates a system prompt that descrives the format to the LLM
+# example system prompt behind the scene 9handled by the `with_structured_output()` method
+"""
+you are an AI assistant that extraects structured insights from text. Given a product review, extract:
+    - summary: a brief overview of the main points
+    - sentiment: overall tone of the review (postiive, negative, neutral)
+Return the response in json format.
+"""
+
+result = structured_model.invoke(prompt)
+
+print(result) # {'summary': ..., 'sentiment': ...}
+print(result['summary']) # ...
+print(result['sentiment']) # ...
+```
+
+> just define and mention the data format you want.
+
+[note] in `with_structured_output()` method explore these parameters:
+
+- `json_mode` --> want output as json format
+- `function_calling` --> call another function with the output
+
+3 ways to specify the data format:
+
+- TypedDict: Basic structure and type enforcement only
+- Pydantic: All features except cross-language compatibility (best for Python-centric apps with validation needs)
+- JSON Schema: Basic structure, type enforcement, validation, and cross-language compatibility (but no default values or automatic conversion)
+
+when to use what:
+
+| Feature                      | TypedDict | Pydantic | JSON Schema |
+| ---------------------------- | --------- | -------- | ----------- |
+| Basic structure              | ✔         | ✔        | ✔           |
+| Type enforcement             | ✔         | ✔        | ✔           |
+| Data validation              | x         | ✔        | ✔           |
+| Default values               | x         | ✔        | x           |
+| Automatic conversion         | x         | ✔        | x           |
+| Cross-language compatibility | x         | x        | ✔           |
+
+#### Output Parsers
+
+Output Parsers in langchain help **converting raw LLM responses into structured formats** like json, csv, pydantic models and more. They ensure consistency, validation and ease of use in apps.
+
+There are many output parsers in langchain. most commonly used are:
+
+- `StrOutputParser` - Extracts raw string output from LLM responses
+- `JsonOutputParser` - Parses LLM output into valid JSON objects but LLM decides the json schema
+- `StructuredOutputParser` - Converts LLM responses into predefined structured formats (validation not enforced) with field definitions
+- `PydanticOutputParser` - Validates and parses LLM output into type-safe Pydantic models
+
+when to use what:
+
+| Feature                     | StrOutputParser | JsonOutputParser | StructuredOutputParser | PydanticOutputParser |
+| --------------------------- | --------------- | ---------------- | ---------------------- | -------------------- |
+| Raw string output           | ✔               | x                | x                      | x                    |
+| JSON parsing                | x               | ✔                | ✔                      | ✔                    |
+| Schema definition           | x               | x                | ✔                      | ✔                    |
+| Type validation             | x               | x                | x                      | ✔                    |
+| Field descriptions          | x               | x                | ✔                      | ✔                    |
+| Default values              | x               | x                | x                      | ✔                    |
+| Automatic type conversion   | x               | x                | x                      | ✔                    |
+| Error handling & validation | x               | x                | x                      | ✔                    |
+
+**why use parser?**
+It plays very well with chain component and reduce code complexity.
+
+Example usage simple yet powerful `StrOutputParser` or any parser that matters:
+
+```text
+[example workflow to implement] topic --> LLM --> detailed report --> LLM --> 5 line summary
+```
+
+```python
+template1 = PromptTemplate(
+    template='Write a detailed report on {topic}',
+    input_variables=['topic']
+)
+
+# 2nd prompt -> summary
+template2 = PromptTemplate(
+    template='Write a 5 line summary on the following text. /n {text}',
+    input_variables=['text']
+)
+
+parser = StrOutputParser()
+chain = template1 | model | parser | template2 | model | parser
+result = chain.invoke({'topic':'black hole'})
+```
+
+for more visit <a href="https://github.com/campusx-official/langchain-output-parsers">this repo</a>
+
+---
+
+### Chains
